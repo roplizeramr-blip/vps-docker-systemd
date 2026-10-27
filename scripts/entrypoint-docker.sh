@@ -143,9 +143,42 @@ if [ "${HIDE_CONTAINER:-0}" = "1" ]; then
     rm -f /.dockerenv
 fi
 
+# ------------------------------------------------------------------ pre-flight diagnostics
+# Printed to stdout before systemd takes over, so the platform log always
+# shows what the container was allowed to do (capabilities, cgroups, ...).
+{
+    echo "===== PRE-FLIGHT ====="
+    echo "--- capabilities ---"
+    grep -E '^(CapInh|CapPrm|CapEff|CapBnd|NoNewPrivs|Seccomp):' /proc/self/status 2>/dev/null || true
+    echo "--- cgroup ---"
+    cat /proc/self/cgroup 2>/dev/null || true
+    mount 2>/dev/null | grep -i cgroup || echo "NO CGROUP MOUNT"
+    if touch /sys/fs/cgroup/.write-probe 2>/dev/null; then
+        echo "CGROUP ROOT: writable"
+        rm -f /sys/fs/cgroup/.write-probe
+    else
+        echo "CGROUP ROOT: NOT writable"
+    fi
+    if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+        echo "cgroup v2 controllers: $(cat /sys/fs/cgroup/cgroup.controllers 2>/dev/null)"
+    fi
+    echo "--- systemd ---"
+    /lib/systemd/systemd --version 2>/dev/null | head -2 || true
+    ls -l /dev/console 2>&1 || true
+} 2>&1
+
+# systemd writes its own log to /dev/console.  Point that at stdout so the
+# platform captures it (otherwise the boot messages disappear and the only
+# symptom is a silent container).
+if [ "${SYSTEMD_CONSOLE_STDOUT:-1}" = "1" ]; then
+    ln -sf /proc/self/fd/1 /dev/console 2>/dev/null || true
+fi
+
 # ------------------------------------------------------------------ hand PID 1 to systemd
 # Default target (multi-user.target) pulls cloud-desktop.target, which brings
 # up vnc, websockify, xfce, nginx and control as real systemd units.
 exec /lib/systemd/systemd --system \
+    --log-target=console \
+    --log-level="${SYSTEMD_LOG_LEVEL:-info}" \
     --default-standard-output=journal+console \
     --default-standard-error=journal+console

@@ -122,6 +122,8 @@ RUN install -m 0644 /opt/desktop-src/vps/systemd/*.service \
 RUN mkdir -p /etc/systemd/system/multi-user.target.wants && \
     ln -sfn /etc/systemd/system/cloud-desktop.target \
             /etc/systemd/system/multi-user.target.wants/cloud-desktop.target && \
+    ln -sfn /etc/systemd/system/diag.service \
+            /etc/systemd/system/multi-user.target.wants/diag.service && \
     ln -sfn /lib/systemd/system/multi-user.target /etc/systemd/system/default.target && \
     mkdir -p /etc/systemd/system/sysinit.target.wants && \
     ln -sfn /lib/systemd/system/dbus.service /etc/systemd/system/sysinit.target.wants/dbus.service
